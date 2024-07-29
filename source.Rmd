@@ -1,0 +1,21 @@
+---
+title: "STAT452 Final Project"
+author: "Luu Quoc Bao - 22125008, Le Minh Hoang - 22125029, Le Duc Nhuan - 22125070,
+  Dang Minh Nhut - 22125071"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Library
+
+```{r}
+library(tidyverse)
+```
+
+## Activity 1
+
+## Activity 2
