@@ -1,0 +1,238 @@
+---
+title: "Student Performance"
+author: "Dang Minh Nhut - 22125071"
+date: '`r Sys.Date()`'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(corrplot)
+```
+
+## Load data
+
+```{r}
+set.seed(452)
+```
+
+```{r}
+df <- read.csv("cancer_reg.csv")
+head(df)
+```
+
+### NA
+
+```{r}
+sum(is.na(df))
+```
+
+```{r}
+df <- na.omit(df)
+sum(is.na(df))
+```
+
+### Duplications
+
+```{r}
+sum(duplicated(df))
+```
+
+```{r}
+length(unique(df$Geography))
+```
+
+### Plots
+
+```{r}
+par(mfrow = c(2, 5))
+for (col in names(df)) {
+  if (is.numeric(df[[col]]))
+    hist(df[[col]], main = col, xlab = col, breaks = 30)
+}
+par(mfrow = c(1, 1))
+```
+
+```{r}
+par(mfrow = c(2, 5))
+
+for (col in names(df)) {
+  if (is.numeric(df[[col]]))
+    boxplot(df[col], main = col)
+}
+
+par(mfrow = c(1, 1))
+```
+
+```{r}
+target <- df$TARGET_deathRate  # replace 'rain' with your actual target variable name
+
+# Loop through each predictor and create scatter plots
+for (col_name in colnames(df)) {
+  if (col_name != "TARGET_deathRate" & is.numeric(df[[col_name]])) {  # replace 'rain' with your actual target variable name
+    predictor <- df[[col_name]]
+    
+    # Create the scatter plot
+    plot(predictor, target, main = paste("Scatter Plot of", col_name, "vs", "TARGET_deathRate"),
+         xlab = col_name, ylab = "TARGET_deathRate", pch = 19, col = "blue")
+    
+    # Optionally, you can add a regression line
+    abline(lm(target ~ predictor), col = "red", lwd = 2)
+  }
+}
+```
+
+```{r}
+cor_matrix <- cor(subset(df, select = - c(Geography, binnedInc)))
+# Set a threshold for high correlation
+threshold <- 0.8
+
+# Find highly correlated pairs
+high_corr <- which(abs(cor_matrix) > threshold, arr.ind = TRUE)
+
+# Filter out diagonal elements (self-correlations)
+high_corr <- high_corr[high_corr[,1] != high_corr[,2],]
+
+# Create a data frame to display the pairs and their correlation
+high_corr_df <- data.frame(
+  Column1 = rownames(cor_matrix)[high_corr[, 1]],
+  Column2 = colnames(cor_matrix)[high_corr[, 2]],
+  Correlation = cor_matrix[high_corr]
+)
+
+# Remove duplicate pairs
+high_corr_df <- high_corr_df[!duplicated(t(apply(high_corr_df, 1, sort))), ]
+
+# View the result
+print(high_corr_df)
+```
+
+```{r}
+df_clean <- df
+df_clean$MedianAge <- NULL
+df_clean$MedianAgeMale <- NULL
+df_clean$MedianAgeFemale <- NULL
+df_clean$studyPerCap <- NULL
+df_clean$avgDeathsPerYear <- NULL
+df_clean$Geography <- NULL
+df_clean$popEst2015 <- NULL
+df_clean$PctAsian <- NULL
+df_clean$binnedInc <- NULL
+df_clean$PctOtherRace <- NULL
+```
+
+```{r}
+cor_matrix <- cor(df_clean)
+# Set a threshold for high correlation
+threshold <- 0.8
+
+# Find highly correlated pairs
+high_corr <- which(abs(cor_matrix) > threshold, arr.ind = TRUE)
+
+# Filter out diagonal elements (self-correlations)
+high_corr <- high_corr[high_corr[,1] != high_corr[,2],]
+
+# Create a data frame to display the pairs and their correlation
+high_corr_df <- data.frame(
+  Column1 = rownames(cor_matrix)[high_corr[, 1]],
+  Column2 = colnames(cor_matrix)[high_corr[, 2]],
+  Correlation = cor_matrix[high_corr]
+)
+
+# Remove duplicate pairs
+high_corr_df <- high_corr_df[!duplicated(t(apply(high_corr_df, 1, sort))), ]
+
+# View the result
+print(high_corr_df)
+```
+
+```{r}
+corrplot(cor_matrix)
+```
+
+## Split
+
+```{r}
+# Define the split ratio
+train_ratio <- 0.8
+
+# Determine the number of rows in the training set
+train_size <- floor(train_ratio * nrow(df))
+
+# Randomly sample row indices for the training set
+train_indices <- sample(seq_len(nrow(df)), size = train_size)
+
+# Split the data into training and testing sets
+train_set <- df_clean[train_indices, ]
+test_set <- df_clean[-train_indices, ]
+
+# Display the number of rows in each set
+dim(train_set) # Should be approximately 80
+dim(test_set)  # Should be approximately 20
+```
+
+## Model
+
+```{r}
+model_full <- lm(TARGET_deathRate ~ ., data = train_set)
+summary(model_full)
+```
+
+```{r}
+car::vif(model_full)
+```
+
+```{r}
+model_reduced <- update(model_full, .~. - PctSomeCol18_24)
+car::vif(model_reduced)
+```
+
+```{r}
+model_reduced <- update(model_reduced, .~. - PctPrivateCoverageAlone)
+car::vif(model_reduced)
+```
+
+```{r}
+model_bw <- step(model_reduced, direction = "backward")
+```
+
+```{r}
+summary(model_bw)
+```
+
+```{r}
+model <- update(model_bw, . ~. + I(incidenceRate^2))
+summary(model)
+```
+
+```{r}
+predictions <- predict(model, newdata = test_set)
+# Actual values from the test set 
+actual_values <- test_set$TARGET_deathRate
+# Calculate Mean Squared Error (MSE) 
+mse <- mean((predictions - actual_values)^2)  
+# Calculate R-squared 
+rss <- sum((predictions - actual_values)^2) 
+tss <- sum((actual_values - mean(actual_values))^2) 
+r_squared <- 1 - (rss / tss)  
+# Print metrics 
+cat("Mean Squared Error (MSE):", mse, "\n") 
+cat("R-squared:", r_squared, "\n")
+```
+
+```{r}
+e <- predictions - actual_values
+qqnorm(e)
+qqline(e, col = "red")
+```
+
+```{r}
+shapiro.test(e)
+```
+
+```{r}
+hist(e, main = "Histogram of Residuals", xlab = "Residuals", breaks = 50)
+```
