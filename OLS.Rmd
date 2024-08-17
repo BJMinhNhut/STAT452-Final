@@ -16,7 +16,7 @@ library(corrplot)
 ## Load data
 
 ```{r}
-set.seed(452)
+set.seed(1501)
 ```
 
 ```{r}
@@ -160,10 +160,10 @@ corrplot(cor_matrix)
 train_ratio <- 0.8
 
 # Determine the number of rows in the training set
-train_size <- floor(train_ratio * nrow(df))
+train_size <- floor(train_ratio * nrow(df_clean))
 
 # Randomly sample row indices for the training set
-train_indices <- sample(seq_len(nrow(df)), size = train_size)
+train_indices <- sample(seq_len(nrow(df_clean)), size = train_size)
 
 # Split the data into training and testing sets
 train_set <- df_clean[train_indices, ]
