@@ -24,7 +24,7 @@ library(dplyr)
 ## Activity 1
 
 ```{r}
-set.seed(452)
+set.seed(123)
 ```
 
 ### 1.1 Load and clean data
@@ -163,10 +163,15 @@ par(mfrow = c(1, 1))
 ### 1.2 Split data
 
 ```{r}
-df$log_mgp <- log(df$mgp)
 df$log_weight <- log(df$weight)
 df$log_displacement <- log(df$displacement)
 df$log_horsepower <- log(df$horsepower)
+df$sqr_weight <- (df$weight)^2
+df$sqr_displacement <- (df$displacement)^2
+df$sqr_horsepower <- (df$horsepower)^2
+df$sqr_year <- (df$model_year)^2
+# df$cylinder_id <- as.factor(df$cylinders)
+# df$year_id <- as.factor(df$model_year)
 ```
 
 ```{r}
@@ -201,11 +206,51 @@ corrplot(cor(subset(df_clean, select = -origin_id)), method = "number")
 ```
 
 ```{r}
-corrplot(cor(log(subset(df_clean, select = -origin_id))), method = "number")
+par(mfrow = c(2, 4))
+
+for (col in names(train_set)) {
+  if (is.numeric(train_set[[col]]))
+    boxplot(train_set[col], main = col)
+}
+
+par(mfrow = c(1, 1))
 ```
 
 ```{r}
-model_full <- lm(mgp ~ . - origin - log_mgp, data = train_set)
+# Function to remove outliers using IQR for a single column
+identify_outliers_IQR <- function(x) {
+  Q1 <- quantile(x, 0.25)
+  Q3 <- quantile(x, 0.75)
+  IQR <- Q3 - Q1
+  lower_bound <- Q1 - 1.5 * IQR
+  upper_bound <- Q3 + 1.5 * IQR
+  !(x >= lower_bound & x <= upper_bound)
+}
+
+# Identify outliers for each numeric column
+outlier_matrix <- train_set %>%
+  select(where(is.numeric)) %>%
+  mutate(across(everything(), identify_outliers_IQR))
+
+# Filter out rows with any outlier
+train_set_cleaned <- train_set[!apply(outlier_matrix, 1, any), ]
+
+dim(train_set_cleaned)
+```
+
+```{r}
+par(mfrow = c(2, 5))
+
+for (col in names(train_set_cleaned)) {
+  if (is.numeric(train_set_cleaned[[col]]))
+    boxplot(train_set_cleaned[col], main = col)
+}
+
+par(mfrow = c(1, 1))
+```
+
+```{r}
+model_full <- lm(mgp ~ . - origin, data = train_set)
 summary(model_full)
 ```
 
@@ -222,7 +267,7 @@ summary(model_bw)
 ```
 
 ```{r}
-model <- update(model_bw, . ~ . - weight)
+model <- update(model_bw, . ~ .)
 summary(model)
 ```
 
@@ -246,7 +291,7 @@ cat("R-squared:", r_squared, "\n")
 
 ```{r}
 e <- predictions - actual_values
-hist(e, main = "Histogram of Residuals", xlab = "Residuals", breaks = 30)
+hist(e, main = "Histogram of Residuals", xlab = "Residuals", breaks = 50)
 ```
 
 ```{r}

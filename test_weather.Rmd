@@ -1,0 +1,128 @@
+---
+title: "test_weather"
+author: "Dang Minh Nhut - 22125071"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+set.seed(452)
+```
+
+```{r}
+df <- read.csv("weather.csv")
+head(df)
+```
+
+```{r}
+# Convert the date_col to Date type (if necessary)
+df$date <- as.Date(df$date, format = "%Y-%m-%d")
+
+# Create the 'year' and 'md' columns
+df$year <- as.integer(format(df$date, "%Y"))
+df$month <- as.factor(format(df$date, "%m"))
+df$day <- as.factor(format(df$date, "%d"))
+```
+
+```{r}
+df$winddir_id <- as.factor(df$wind_d)
+df$province_id <- as.factor(df$province)
+```
+
+```{r}
+df$avg <- (df$min + df$max)/2
+```
+
+```{r}
+par(mfrow = c(2, 5))
+for (col in names(df)) {
+  if (is.numeric(df[[col]]))
+    hist(df[[col]], main = paste("Histogram of", col), xlab = col, breaks = 30)
+}
+par(mfrow = c(1, 1))
+```
+
+```{r}
+par(mfrow = c(2, 5))
+
+for (col in names(df)) {
+  if (is.numeric(df[[col]]))
+    boxplot(df[col], main = col)
+}
+
+par(mfrow = c(1, 1))
+```
+
+```{r}
+# Define the split ratio
+train_ratio <- 0.8
+
+# Determine the number of rows in the training set
+train_size <- floor(train_ratio * nrow(df))
+
+# Randomly sample row indices for the training set
+train_indices <- sample(seq_len(nrow(df)), size = train_size)
+
+# Split the data into training and testing sets
+train_set <- df[train_indices, ]
+test_set <- df[-train_indices, ]
+
+# Display the number of rows in each set
+dim(train_set) # Should be approximately 80
+dim(test_set)  # Should be approximately 20
+```
+
+```{r}
+plot(df$avg, df$rain)
+```
+
+```{r}
+corrplot(cor(subset(df, select = -c(date, day, wind_d, winddir_id,province, province_id, month, year))), method = "number")
+```
+
+```{r}
+model_full <- lm(avg ~ . - max - min - date - day - wind_d - province + I(wind^2) + I(cloud^2) + I(humidi^2) + I(pressure^2) +  I(wind*cloud) + I(cloud*humidi) + I(wind*humidi) + I(wind*cloud) + I(wind*pressure) + I(cloud*pressure) + I(pressure*humidi), data = train_set)
+summary(model_full)
+```
+
+```{r}
+model <- update(model_full, .~. - cloud)
+summary(model)
+```
+
+```{r}
+model <- update(model_full, .~. - I(wind * cloud))
+summary(model)
+```
+
+```{r}
+predictions <- predict(model, newdata = test_set)
+# Actual values from the test set 
+actual_values <- test_set$avg
+# Calculate Mean Squared Error (MSE) 
+mse <- mean((predictions - actual_values)^2)  
+# Calculate R-squared 
+rss <- sum((predictions - actual_values)^2) 
+tss <- sum((actual_values - mean(actual_values))^2) 
+r_squared <- 1 - (rss / tss)  
+# Print metrics cat("Mean Squared Error (MSE):", mse, "\n") 
+cat("R-squared:", r_squared, "\n")
+```
+
+```{r}
+e <- predictions - actual_values
+qqnorm(e)
+qqline(e, col = "red")
+```
+
+```{r}
+shapiro.test(sample(e, 5000))
+```
+
+```{r}
+hist(e, main = "Histogram of Residuals", xlab = "Residuals", breaks = 200)
+```
