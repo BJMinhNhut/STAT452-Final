@@ -601,6 +601,9 @@ summary(baseline)</code></pre>
 ## Residual standard error: 3.376 on 304 degrees of freedom
 ## Multiple R-squared:  0.8207, Adjusted R-squared:  0.816 
 ## F-statistic: 173.9 on 8 and 304 DF,  p-value: &lt; 2.2e-16</code></pre>
+</div>
+<div id="multicollinearity" class="section level3">
+<h3>Multicollinearity</h3>
 <p>To check for multicollinearity, we calculate the Variance Inflation
 Factor (VIF) of the variables.</p>
 <pre class="r"><code>vif(baseline)</code></pre>
@@ -618,6 +621,9 @@ vif(baseline)</code></pre>
 ##     1.619644</code></pre>
 <p>Now all variables have VIF values less than 10, indicating that there
 is no strong multicollinearity in the model.</p>
+</div>
+<div id="stepwise-algorithm" class="section level3">
+<h3>Stepwise Algorithm</h3>
 <p>We apply Stepwise Algorithm to select the best model.</p>
 <pre class="r"><code>step_baseline&lt;-step(baseline, direction = &quot;both&quot;)</code></pre>
 <pre><code>## Start:  AIC=776.81
@@ -712,6 +718,11 @@ applying the VIF test.</p>
 <p>Compared to the previous model, the VIF values of the variables are
 much lower, indicating that there is no multicollinearity in the
 model.</p>
+</div>
+<div id="model-diagnostics" class="section level3">
+<h3>Model diagnostics</h3>
+<div id="normality-of-residuals" class="section level4">
+<h4>Normality of residuals</h4>
 <p>We now plot the Q-Q plot of the residuals to check for normality.</p>
 <pre class="r"><code>qqnorm(step_baseline$residuals)
 qqline(step_baseline$residuals, col = &quot;red&quot;)</code></pre>
@@ -734,14 +745,23 @@ test.</p>
 that the residuals are not normally distributed. This is consistent with
 the Q-Q plot, where the residuals have heavier tails than a normal
 distribution.</p>
-<p>We also perform the Breusch-Pagan test and Durbin-Watson test to
-check for homoscedasticity and autocorrelation, respectively.</p>
+</div>
+<div id="homoscedasticity" class="section level4">
+<h4>Homoscedasticity</h4>
+<p>We also perform the Breusch-Pagan test to check for
+homoscedasticity.</p>
 <pre class="r"><code>lmtest::bptest(step_baseline)</code></pre>
 <pre><code>## 
 ##  studentized Breusch-Pagan test
 ## 
 ## data:  step_baseline
 ## BP = 20.345, df = 4, p-value = 0.0004269</code></pre>
+<p>The p-value of the Breusch-Pagan test is less than 0.05, indicating
+that the residuals are heteroscedastic.</p>
+</div>
+<div id="autocorrelation" class="section level4">
+<h4>Autocorrelation</h4>
+<p>We perform the Durbin-Watson test to check for autocorrelation.</p>
 <pre class="r"><code>lmtest::dwtest(step_baseline, alternative=&quot;two.sided&quot;)</code></pre>
 <pre><code>## 
 ##  Durbin-Watson test
@@ -749,13 +769,19 @@ check for homoscedasticity and autocorrelation, respectively.</p>
 ## data:  step_baseline
 ## DW = 1.8988, p-value = 0.3679
 ## alternative hypothesis: true autocorrelation is not 0</code></pre>
-<p>The p-value of the Breusch-Pagan test is less than 0.05, indicating
-that the residuals are heteroscedastic. The Durbin-Watson test gives a
-DW value close to 2, indicating that there is no autocorrelation.</p>
+<p>The Durbin-Watson test gives a DW value close to 2, indicating that
+there is no autocorrelation.</p>
+</div>
+<div id="conclusion-on-model-diagnostics" class="section level4">
+<h4>Conclusion on model diagnostics</h4>
 <p>In conclusion, the model is not ideal as the residuals are not
 normally distributed and heteroscedastic. However, the model is still
 acceptable as the residuals are approximately normally distributed in
 the middle range and there is no autocorrelation in the residuals.</p>
+</div>
+</div>
+<div id="model-testing" class="section level3">
+<h3>Model testing</h3>
 <p>Testing on the test set, we get the following results.</p>
 <pre class="r"><code>predictions &lt;- predict(step_baseline, newdata = test_set) 
 # Actual values from the test set 
@@ -781,6 +807,10 @@ model.</p>
 </div>
 <div id="improving-the-model" class="section level2">
 <h2>Improving the model</h2>
+<div id="adding-new-variables" class="section level3">
+<h3>Adding new variables</h3>
+<div id="adding-log-transformation" class="section level4">
+<h4>Adding log transformation</h4>
 <p>We investigate the relationship between “mpg” and other
 variables.</p>
 <p>First, we plot boxplots of all variables.</p>
@@ -837,15 +867,24 @@ we will include the log transformation of “displacement” and “weight” in
 the data.</p>
 <pre class="r"><code>train_set$log_displacement &lt;- log(train_set$displacement)
 train_set$log_weight &lt;- log(train_set$weight)</code></pre>
+</div>
+<div id="adding-interaction-terms" class="section level4">
+<h4>Adding interaction terms</h4>
 <p>In reality, the work done by the engine is the product of the force
 applied to the car and the distance the car moves. The force applied to
 the car is the product of the mass of the car and the acceleration
 (<span class="math inline">\(F=m\times a\)</span>, where <span class="math inline">\(F\)</span> is the force, <span class="math inline">\(m\)</span> is the mass, and <span class="math inline">\(a\)</span> is the acceleration). Therefore, we
 will include the interaction between “weight” and “acceleration” in the
 data.</p>
+</div>
+<div id="adding-polynomial-terms" class="section level4">
+<h4>Adding polynomial terms</h4>
 <p>Moreover, the fuel consumption from the 1970s to the 1980s has a
 quadratic increase. Therefore, we will include the square of time from
 “model year” to 1970 in the data.</p>
+</div>
+<div id="new-model" class="section level4">
+<h4>New model</h4>
 <p>Our new model is as follows:</p>
 <pre class="r"><code>new_model &lt;- lm(mgp ~ . + I(weight * acceleration) + I((model_year-70)^2), data = train_set)
 summary(new_model)</code></pre>
@@ -880,6 +919,10 @@ summary(new_model)</code></pre>
 ## Residual standard error: 2.922 on 282 degrees of freedom
 ## Multiple R-squared:  0.8624, Adjusted R-squared:  0.8561 
 ## F-statistic:   136 on 13 and 282 DF,  p-value: &lt; 2.2e-16</code></pre>
+</div>
+</div>
+<div id="multicollinearity-1" class="section level3">
+<h3>Multicollinearity</h3>
 <p>To check for multicollinearity, we calculate the Variance Inflation
 Factor (VIF) of the variables. As the VIF values of many variables are
 high, we progressively remove the variable with the highest VIF value,
@@ -950,6 +993,9 @@ vif(new_model)</code></pre>
 ##                 1.642312                 9.692959                 7.526612 
 ##   I((model_year - 70)^2) 
 ##                 1.244208</code></pre>
+</div>
+<div id="stepwise-algorithm-1" class="section level3">
+<h3>Stepwise Algorithm</h3>
 <p>We now apply Stepwise Algorithm to select the best model.</p>
 <pre class="r"><code>stepwise_new_model &lt;- step(new_model, direction = &quot;both&quot;)</code></pre>
 <pre><code>## Start:  AIC=661.98
@@ -1042,6 +1088,11 @@ Variance Inflation Factor (VIF) of the variables.</p>
 ##                 1.547234                 1.184841</code></pre>
 <p>All VIF values are now much lower than 10, indicating that there is
 no multicollinearity in the model.</p>
+</div>
+<div id="model-diagnostics-1" class="section level3">
+<h3>Model diagnostics</h3>
+<div id="normality-of-residuals-1" class="section level4">
+<h4>Normality of residuals</h4>
 <p>We now plot the Q-Q plot of the residuals to check for normality.</p>
 <pre class="r"><code>qqnorm(final_model$residuals)
 qqline(final_model$residuals, col = &quot;red&quot;)</code></pre>
@@ -1063,14 +1114,23 @@ residuals.</p>
 that the residuals are not normally distributed. This once again aligns
 with the Q-Q plot, where the residuals have heavier tails than a normal
 distribution.</p>
-<p>We also perform the Breusch-Pagan test and Durbin-Watson test to
-check for homoscedasticity and autocorrelation, respectively.</p>
+</div>
+<div id="homoscedasticity-1" class="section level4">
+<h4>Homoscedasticity</h4>
+<p>We also perform the Breusch-Pagan test to check for
+homoscedasticity.</p>
 <pre class="r"><code>lmtest::bptest(final_model)</code></pre>
 <pre><code>## 
 ##  studentized Breusch-Pagan test
 ## 
 ## data:  final_model
 ## BP = 23.484, df = 5, p-value = 0.0002728</code></pre>
+<p>The p-value of the Breusch-Pagan test is less than 0.05, indicating
+that the residuals are heteroscedastic.</p>
+</div>
+<div id="autocorrelation-1" class="section level4">
+<h4>Autocorrelation</h4>
+<p>We perform the Durbin-Watson test to check for autocorrelation.</p>
 <pre class="r"><code>lmtest::dwtest(final_model, alternative=&quot;two.sided&quot;)</code></pre>
 <pre><code>## 
 ##  Durbin-Watson test
@@ -1078,10 +1138,11 @@ check for homoscedasticity and autocorrelation, respectively.</p>
 ## data:  final_model
 ## DW = 1.9581, p-value = 0.7139
 ## alternative hypothesis: true autocorrelation is not 0</code></pre>
-<p>The p-value of the Breusch-Pagan test is less than 0.05, indicating
-that the residuals are heteroscedastic. However, the Durbin-Watson test
-gives a DW value close to 2, indicating that there is no
-autocorrelation.</p>
+<p>The Durbin-Watson test gives a DW value close to 2, indicating that
+there is no autocorrelation.</p>
+</div>
+<div id="conclusion-on-model-diagnostics-1" class="section level4">
+<h4>Conclusion on model diagnostics</h4>
 <p>In conclusion, the model is not ideal as the residuals are not
 normally distributed and heteroscedastic. However, the model is still
 acceptable as the residuals are approximately normally distributed in
@@ -1090,6 +1151,10 @@ Moreover, the R-squared value of the model is approximately 0.85,
 indicating that the model explains 85% of the variance in the data. This
 is a better result than the baseline model, suggesting that the new
 model is more effective in predicting “mpg”.</p>
+</div>
+</div>
+<div id="model-testing-1" class="section level3">
+<h3>Model testing</h3>
 <p>To conduct testing on the test set, we first add the log
 transformation of “horsepower”, “displacement”, and “weight” to the test
 set.</p>
@@ -1113,6 +1178,7 @@ cat(&quot;R-squared:&quot;, r_squared, &quot;\n&quot;)</code></pre>
 <p>The R-squared is approximately 0.86, which is higher than the
 R-squared of the baseline model. This suggests that the final model is
 more effective in predicting “mpg” than the baseline model.</p>
+</div>
 </div>
 <div id="conclusion" class="section level2">
 <h2>Conclusion</h2>

@@ -200,6 +200,8 @@ baseline <- lm(mgp ~ ., data = train_set)
 summary(baseline)
 ```
 
+### Multicollinearity
+
 To check for multicollinearity, we calculate the Variance Inflation Factor (VIF) of the variables.
 
 ```{r}
@@ -214,6 +216,8 @@ vif(baseline)
 ```
 
 Now all variables have VIF values less than 10, indicating that there is no strong multicollinearity in the model.
+
+### Stepwise Algorithm
 
 We apply Stepwise Algorithm to select the best model.
 
@@ -238,6 +242,10 @@ vif(step_baseline)
 
 Compared to the previous model, the VIF values of the variables are much lower, indicating that there is no multicollinearity in the model.
 
+### Model diagnostics
+
+#### Normality of residuals
+
 We now plot the Q-Q plot of the residuals to check for normality.
 
 ```{r}
@@ -255,16 +263,31 @@ shapiro.test(step_baseline$residuals)
 
 The p-value of the Shapiro-Wilk test is less than 0.05, indicating that the residuals are not normally distributed. This is consistent with the Q-Q plot, where the residuals have heavier tails than a normal distribution.
 
-We also perform the Breusch-Pagan test and Durbin-Watson test to check for homoscedasticity and autocorrelation, respectively.
+#### Homoscedasticity
+
+We also perform the Breusch-Pagan test to check for homoscedasticity.
 
 ```{r}
 lmtest::bptest(step_baseline)
+```
+
+The p-value of the Breusch-Pagan test is less than 0.05, indicating that the residuals are heteroscedastic.
+
+#### Autocorrelation
+
+We perform the Durbin-Watson test to check for autocorrelation.
+
+```{r}
 lmtest::dwtest(step_baseline, alternative="two.sided")
 ```
 
-The p-value of the Breusch-Pagan test is less than 0.05, indicating that the residuals are heteroscedastic. The Durbin-Watson test gives a DW value close to 2, indicating that there is no autocorrelation.
+The Durbin-Watson test gives a DW value close to 2, indicating that there is no autocorrelation.
+
+#### Conclusion on model diagnostics
 
 In conclusion, the model is not ideal as the residuals are not normally distributed and heteroscedastic. However, the model is still acceptable as the residuals are approximately normally distributed in the middle range and there is no autocorrelation in the residuals.
+
+### Model testing
 
 Testing on the test set, we get the following results.
 
@@ -285,6 +308,10 @@ cat("R-squared:", r_squared, "\n")
 The R-squared is approximately 0.82, indicating that the model explains 82% of the variance in the data. This is a good result, suggesting that the model is effective in predicting "mpg". However, we believe that the absence of "horsepower" in the model is contradictory to the real-world relationship between "mpg" and "horsepower", as the more powerful the engine, the higher the fuel consumption. This suggests that the model can be improved by including "horsepower" in the model.
 
 ## Improving the model
+
+### Adding new variables
+
+#### Adding log transformation
 
 We investigate the relationship between "mpg" and other variables.
 
@@ -350,9 +377,15 @@ train_set$log_displacement <- log(train_set$displacement)
 train_set$log_weight <- log(train_set$weight)
 ```
 
+#### Adding interaction terms
+
 In reality, the work done by the engine is the product of the force applied to the car and the distance the car moves. The force applied to the car is the product of the mass of the car and the acceleration ($F=m\times a$, where $F$ is the force, $m$ is the mass, and $a$ is the acceleration). Therefore, we will include the interaction between "weight" and "acceleration" in the data.
 
+#### Adding polynomial terms
+
 Moreover, the fuel consumption from the 1970s to the 1980s has a quadratic increase. Therefore, we will include the square of time from "model year" to 1970 in the data.
+
+#### New model
 
 Our new model is as follows:
 
@@ -360,6 +393,8 @@ Our new model is as follows:
 new_model <- lm(mgp ~ . + I(weight * acceleration) + I((model_year-70)^2), data = train_set)
 summary(new_model)
 ```
+
+### Multicollinearity
 
 To check for multicollinearity, we calculate the Variance Inflation Factor (VIF) of the variables. As the VIF values of many variables are high, we progressively remove the variable with the highest VIF value, and repeat calculating the VIF values until all VIF values are less than 10.
 
@@ -378,6 +413,8 @@ vif(new_model)
 new_model <- update(new_model, . ~ . -model_year)
 vif(new_model)
 ```
+
+### Stepwise Algorithm
 
 We now apply Stepwise Algorithm to select the best model.
 
@@ -409,6 +446,10 @@ vif(final_model)
 
 All VIF values are now much lower than 10, indicating that there is no multicollinearity in the model.
 
+### Model diagnostics
+
+#### Normality of residuals
+
 We now plot the Q-Q plot of the residuals to check for normality.
 
 ```{r}
@@ -426,16 +467,31 @@ shapiro.test(final_model$residuals)
 
 The p-value of the Shapiro-Wilk test is less than 0.05, indicating that the residuals are not normally distributed. This once again aligns with the Q-Q plot, where the residuals have heavier tails than a normal distribution.
 
-We also perform the Breusch-Pagan test and Durbin-Watson test to check for homoscedasticity and autocorrelation, respectively.
+#### Homoscedasticity
+
+We also perform the Breusch-Pagan test to check for homoscedasticity.
 
 ```{r}
 lmtest::bptest(final_model)
+```
+
+The p-value of the Breusch-Pagan test is less than 0.05, indicating that the residuals are heteroscedastic.
+
+#### Autocorrelation
+
+We perform the Durbin-Watson test to check for autocorrelation.
+
+```{r}
 lmtest::dwtest(final_model, alternative="two.sided")
 ```
 
-The p-value of the Breusch-Pagan test is less than 0.05, indicating that the residuals are heteroscedastic. However, the Durbin-Watson test gives a DW value close to 2, indicating that there is no autocorrelation.
+The Durbin-Watson test gives a DW value close to 2, indicating that there is no autocorrelation.
+
+#### Conclusion on model diagnostics
 
 In conclusion, the model is not ideal as the residuals are not normally distributed and heteroscedastic. However, the model is still acceptable as the residuals are approximately normally distributed in the middle range and there is no autocorrelation in the residuals. Moreover, the R-squared value of the model is approximately 0.85, indicating that the model explains 85% of the variance in the data. This is a better result than the baseline model, suggesting that the new model is more effective in predicting "mpg".
+
+### Model testing
 
 To conduct testing on the test set, we first add the log transformation of "horsepower", "displacement", and "weight" to the test set.
 
