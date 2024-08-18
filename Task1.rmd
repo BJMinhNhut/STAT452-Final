@@ -1,0 +1,473 @@
+---
+title: "STAT452 Final Project"
+author: "Luu Quoc Bao - 22125008, Le Minh Hoang - 22125029, Le Duc Nhuan - 22125070,
+  Dang Minh Nhut - 22125071"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Task 1
+
+## Intial setup
+
+### Library
+
+```{r}
+library(ggplot2)
+library(readxl)
+library(car)
+library(faraway)
+library(corrplot)
+library(dplyr)
+```
+
+### Set seed
+
+```{r}
+set.seed(200)
+```
+
+## Reading and preprocessing data
+
+### Load data
+
+```{r}
+df <- read.csv("auto_mpg.csv", header = TRUE, sep=";")
+dim(df)
+```
+
+### Summary of data
+
+```{r}
+summary(df)
+```
+
+There are total 398 rows and 9 columns in the data. The columns are "mpg", "cylinders", "displacement", "horsepower", "weight", "acceleration", "model year", "origin", and "car name". The description of each column is as follows:
+
+- "mpg": (continuous) fuel consumption in miles per gallon,
+- "cylinders": (multi-valued discrete) number of cylinders,
+- "displacement": (continuous) engine size,
+- "horsepower": (continuous) engine power,
+- "weight": (continuous) mass,
+- "acceleration": (continuous) vehicle acceleration,
+- "model year": (multi-valued discrete) model year (last 2 digits)
+- "origin": (multi-valued discrete) place of manufacture: 1 - North American, 2 - Europe, 3 - Asia
+- "car name": (multi-valued discrete) car name
+
+### Remove car name
+
+The car name is not useful for our analysis, so we remove it.
+
+```{r}
+df$car_name <- NULL
+```
+
+### Remove rows with missing values
+
+Observing the data, we see that there are some rows with '?' values in the horsepower column. We remove these rows.
+
+```{r}
+nrow(df[df$horsepower == '?',]) #6 rows with missing value in horsepower
+df <- df[df$horsepower != '?',]
+```
+
+### Convert horsepower to numeric
+
+```{r}
+is.numeric(df$horsepower)
+```
+
+As we can see, the horsepower column is not numeric, so we convert it to numeric.
+
+```{r}
+df$horsepower <- as.numeric(df$horsepower)
+is.numeric(df$horsepower)
+```
+
+### Remove duplicate rows
+
+We count the number of duplicate rows in the data.
+
+```{r}
+nrow(df[duplicated(df),])
+```
+
+There are no duplicate rows in the data. Therefore, we do not need to remove any rows.
+
+### Change variables to factor
+
+We first plot barplots of each column to see if there are any columns that should be changed to factors.
+
+```{r}
+# Determine the number of columns in df
+num_cols <- ncol(df)
+
+# Calculate the number of rows and columns for the plot layout
+plot_rows <- 2
+plot_cols <- 4
+
+# Set up the plot layout
+par(mfrow = c(plot_rows, plot_cols))
+
+# Loop through each column and create a barplot
+for (col_name in names(df)) {
+  if (col_name == 'mpg') {
+    next
+  }
+  # Get counts for the current column
+  col_counts <- table(df[[col_name]])
+  
+  # Create a barplot for the current column
+  barplot(col_counts, 
+          main = col_name, 
+          xlab = "", 
+          ylab = "Count", 
+          col = rainbow(length(col_counts)),
+          las = 2)  # Rotate x-axis labels if needed
+}
+
+# Reset the plot layout
+par(mfrow = c(1, 1))
+```
+
+#### The "cylinders" column
+
+```{r}
+is.factor(df$cylinders)
+cylinders_counts <- table(df$cylinders)
+barplot(cylinders_counts, main = "Cylinders Distribution", xlab = "Cylinders", ylab = "Count", col = rainbow(length(cylinders_counts)))
+```
+
+Even though the "cylinders" column has only 5 values, we will not change it to a factor because it is quantitatively meaningful.
+
+#### The "origin" column
+```{r}
+is.factor(df$origin)
+origin_counts <- table(df$origin)
+barplot(origin_counts, main = "Origin Distribution", xlab = "Origin", ylab = "Count", col = rainbow(length(origin_counts)))
+```
+
+As we can see, the "origin" column has only 3 values. Moreover, these 3 values are not quantitatively meaningful. Therefore, we will change the "origin" column to a factor.
+
+```{r}
+df$origin <- as.factor(df$origin)
+```
+
+
+### Data after preprocessing
+
+```{r}
+dim(df)
+```
+
+The data now has 392 rows and 8 columns.
+
+## Data splitting
+
+We split the data into training and testing sets. The ratio of the training set to the testing set is 80:20.
+
+```{r}
+# Define the split ratio
+train_ratio <- 0.8
+
+# Determine the number of rows in the training set
+train_size <- floor(train_ratio * nrow(df))
+
+# Randomly sample row indices for the training set
+train_indices <- sample(seq_len(nrow(df)), size = train_size)
+
+# Split the data into training and testing sets
+train_set <- df[train_indices, ]
+test_set <- df[-train_indices, ]
+
+# Display the number of rows in each set
+dim(train_set) # Should be approximately 80
+dim(test_set)  # Should be approximately 20
+```
+
+## Model fitting
+
+### Baseline model
+
+We fit a linear regression model with all original variables to predict "mpg".
+
+```{r}
+baseline <- lm(mgp ~ ., data = train_set)
+summary(baseline)
+```
+
+To check for multicollinearity, we calculate the Variance Inflation Factor (VIF) of the variables.
+
+```{r}
+vif(baseline)
+```
+
+We see that the "displacement" variable has a high VIF value. Therefore, we will remove it from the model.
+
+```{r}
+baseline<-update(baseline, . ~ . -displacement)
+vif(baseline)
+```
+
+Now all variables have VIF values less than 10, indicating that there is no strong multicollinearity in the model.
+
+We apply Stepwise Algorithm to select the best model.
+
+```{r}
+step_baseline<-step(baseline, direction = "both")
+summary(step_baseline)
+```
+
+To validate that the removed variables are not significant, we perform an ANOVA test.
+
+```{r}
+anova(step_baseline, baseline)
+```
+
+The p-value of the ANOVA test is much higher than the significance level of 0.05, indicating that the removed variables are not significant.
+
+We check for the multicolinearity of the variables in the model by applying the VIF test.
+
+```{r}
+vif(step_baseline)
+```
+
+Compared to the previous model, the VIF values of the variables are much lower, indicating that there is no multicollinearity in the model.
+
+We now plot the Q-Q plot of the residuals to check for normality.
+
+```{r}
+qqnorm(step_baseline$residuals)
+qqline(step_baseline$residuals, col = "red")
+```
+
+The residuals are close to the line in the middle, suggesting that the residuals in this range are approximately normally distributed. However, the points at the ends (tails) of the plot deviate from the red line, especially on the right side where the points are higher than the line. This is potentially due to the presence of outliers in the data, which can affect the normality of the residuals.
+
+To test the normality of the residuals, we perform the Shapiro-Wilk test.
+
+```{r}
+shapiro.test(step_baseline$residuals)
+```
+
+The p-value of the Shapiro-Wilk test is less than 0.05, indicating that the residuals are not normally distributed. This is consistent with the Q-Q plot, where the residuals have heavier tails than a normal distribution.
+
+We also perform the Breusch-Pagan test and Durbin-Watson test to check for homoscedasticity and autocorrelation, respectively.
+
+```{r}
+lmtest::bptest(step_baseline)
+lmtest::dwtest(step_baseline, alternative="two.sided")
+```
+
+The p-value of the Breusch-Pagan test is less than 0.05, indicating that the residuals are heteroscedastic. The Durbin-Watson test gives a DW value close to 2, indicating that there is no autocorrelation.
+
+In conclusion, the model is not ideal as the residuals are not normally distributed and heteroscedastic. However, the model is still acceptable as the residuals are approximately normally distributed in the middle range and there is no autocorrelation in the residuals.
+
+Testing on the test set, we get the following results.
+
+```{r}
+predictions <- predict(step_baseline, newdata = test_set) 
+# Actual values from the test set 
+actual_values <- test_set$mgp
+# Calculate Mean Squared Error (MSE) 
+mse <- mean((predictions - actual_values)^2)  
+# Calculate R-squared 
+rss <- sum((predictions - actual_values)^2) 
+tss <- sum((actual_values - mean(actual_values))^2) 
+r_squared <- 1 - (rss / tss)  
+# Print metrics cat("Mean Squared Error (MSE):", mse, "\n") 
+cat("R-squared:", r_squared, "\n")
+```
+
+The R-squared is approximately 0.82, indicating that the model explains 82% of the variance in the data. This is a good result, suggesting that the model is effective in predicting "mpg". However, we believe that the absence of "horsepower" in the model is contradictory to the real-world relationship between "mpg" and "horsepower", as the more powerful the engine, the higher the fuel consumption. This suggests that the model can be improved by including "horsepower" in the model.
+
+## Improving the model
+
+We investigate the relationship between "mpg" and other variables.
+
+First, we plot boxplots of all variables.
+
+```{r}
+par(mfrow = c(2, 4))
+
+for (col in names(train_set)) {
+  if (is.numeric(train_set[[col]]))
+    boxplot(train_set[col], main = col)
+}
+
+par(mfrow = c(1, 1))
+```
+
+We can observe that "horsepower" has many outliers. Therefore, we will remove these outliers using the Interquartile Range (IQR) method.
+
+```{r}
+# Function to remove outliers using IQR for a single column
+identify_outliers_IQR <- function(x) {
+  Q1 <- quantile(x, 0.25)
+  Q3 <- quantile(x, 0.75)
+  IQR <- Q3 - Q1
+  lower_bound <- Q1 - 1.5 * IQR
+  upper_bound <- Q3 + 1.5 * IQR
+  !(x >= lower_bound & x <= upper_bound)
+}
+
+# Identify outliers for each numeric column
+outlier_matrix <- train_set %>%
+  select(where(is.numeric)) %>%
+  mutate(across(everything(), identify_outliers_IQR))
+
+# Filter out rows with any outlier
+train_set <- train_set[!apply(outlier_matrix, 1, any), ]
+
+dim(train_set)
+```
+
+To further investigate the relationship between "mpg" and other variables, we plot scatter plots of "mpg" and other variables.
+
+```{r}
+pairs(subset(train_set, select = - c(origin)))
+```
+
+We can see a curvilinear relationship between "mpg" and "horsepower". Therefore, we will include a log transformation of "horsepower" in the data. Not only aligning with the relationship between "mpg" and "horsepower", the log transformation also helps to reduce the effect of outliers in the "horsepower" column.
+
+```{r}
+train_set$log_horsepower <- log(train_set$horsepower)
+```
+
+Moreover, the scatter plots of "displacment", "weight" with respect to "mpg" has similar pattern to that of "horsepower". To validate our assumption, we use correlation matrix to see the relationship between the variables.
+
+```{r}
+corrplot(cor(subset(train_set, select = -origin)), method = "number")
+```
+
+As "horsepower", "displacement", and "weight" are highly correlated, we will include the log transformation of "displacement" and "weight" in the data.
+
+```{r}
+train_set$log_displacement <- log(train_set$displacement)
+train_set$log_weight <- log(train_set$weight)
+```
+
+In reality, the work done by the engine is the product of the force applied to the car and the distance the car moves. The force applied to the car is the product of the mass of the car and the acceleration ($F=m\times a$, where $F$ is the force, $m$ is the mass, and $a$ is the acceleration). Therefore, we will include the interaction between "weight" and "acceleration" in the data.
+
+Moreover, the fuel consumption from the 1970s to the 1980s has a quadratic increase. Therefore, we will include the square of time from "model year" to 1970 in the data.
+
+Our new model is as follows:
+
+```{r}
+new_model <- lm(mgp ~ . + I(weight * acceleration) + I((model_year-70)^2), data = train_set)
+summary(new_model)
+```
+
+To check for multicollinearity, we calculate the Variance Inflation Factor (VIF) of the variables. As the VIF values of many variables are high, we progressively remove the variable with the highest VIF value, and repeat calculating the VIF values until all VIF values are less than 10.
+
+```{r}
+vif(new_model)
+new_model <- update(new_model, . ~ . -weight)
+vif(new_model)
+new_model <- update(new_model, . ~ . -horsepower)
+vif(new_model)
+new_model <- update(new_model, . ~ . -log_weight)
+vif(new_model)
+new_model <- update(new_model, . ~ . -log_displacement)
+vif(new_model)
+new_model <- update(new_model, . ~ . -displacement)
+vif(new_model)
+new_model <- update(new_model, . ~ . -model_year)
+vif(new_model)
+```
+
+We now apply Stepwise Algorithm to select the best model.
+
+```{r}
+stepwise_new_model <- step(new_model, direction = "both")
+summary(stepwise_new_model)
+```
+
+The Stepwise Algorithm selects the same model as the one we manually selected, suggesting that no other variables should be excluded from the model.
+
+As the p-values of "cylinders" and "acceleration" are higher than the significance level of 0.05, we suspect that these variables are not significant. To validate this, we perform an ANOVA test.
+
+```{r}
+anova(stepwise_new_model, update(stepwise_new_model , . ~ . -cylinders -acceleration))
+```
+
+The p-value of the ANOVA test is much higher than 0.05, indicating that the removed variables are not significant.
+
+```{r}
+final_model <- update(stepwise_new_model, . ~ . -cylinders -acceleration)
+summary(final_model)
+```
+
+To check for multicollinearity of our final model, we calculate the Variance Inflation Factor (VIF) of the variables.
+
+```{r}
+vif(final_model)
+```
+
+All VIF values are now much lower than 10, indicating that there is no multicollinearity in the model.
+
+We now plot the Q-Q plot of the residuals to check for normality.
+
+```{r}
+qqnorm(final_model$residuals)
+qqline(final_model$residuals, col = "red")
+```
+
+The Q-Q plot shows that most points lie close to the line in the center, but there are deviations at both ends (tails). This suggests that while the residuals are roughly normally distributed in the middle range, there are issues in the tails. This suggests that the normality assumption may not be fully satisfied.
+
+We perform the Shapiro-Wilk test to check for normality of the residuals.
+
+```{r}
+shapiro.test(final_model$residuals)
+```
+
+The p-value of the Shapiro-Wilk test is less than 0.05, indicating that the residuals are not normally distributed. This once again aligns with the Q-Q plot, where the residuals have heavier tails than a normal distribution.
+
+We also perform the Breusch-Pagan test and Durbin-Watson test to check for homoscedasticity and autocorrelation, respectively.
+
+```{r}
+lmtest::bptest(final_model)
+lmtest::dwtest(final_model, alternative="two.sided")
+```
+
+The p-value of the Breusch-Pagan test is less than 0.05, indicating that the residuals are heteroscedastic. However, the Durbin-Watson test gives a DW value close to 2, indicating that there is no autocorrelation.
+
+In conclusion, the model is not ideal as the residuals are not normally distributed and heteroscedastic. However, the model is still acceptable as the residuals are approximately normally distributed in the middle range and there is no autocorrelation in the residuals. Moreover, the R-squared value of the model is approximately 0.85, indicating that the model explains 85% of the variance in the data. This is a better result than the baseline model, suggesting that the new model is more effective in predicting "mpg".
+
+To conduct testing on the test set, we first add the log transformation of "horsepower", "displacement", and "weight" to the test set.
+
+```{r}
+# add log to test set
+test_set$log_horsepower <- log(test_set$horsepower)
+test_set$log_displacement <- log(test_set$displacement)
+test_set$log_weight <- log(test_set$weight)
+```
+
+Now we can test the final model on the test set.
+
+```{r}
+predictions <- predict(final_model, newdata = test_set) 
+# Actual values from the test set 
+actual_values <- test_set$mgp
+# Calculate Mean Squared Error (MSE) 
+mse <- mean((predictions - actual_values)^2)  
+# Calculate R-squared 
+rss <- sum((predictions - actual_values)^2) 
+tss <- sum((actual_values - mean(actual_values))^2) 
+r_squared <- 1 - (rss / tss)  
+# Print metrics cat("Mean Squared Error (MSE):", mse, "\n") 
+cat("R-squared:", r_squared, "\n")
+```
+
+The R-squared is approximately 0.86, which is higher than the R-squared of the baseline model. This suggests that the final model is more effective in predicting "mpg" than the baseline model.
+
+## Conclusion
+
+In this task, we first preprocessed the data by removing the "car name" column, removing rows with missing values, converting the "horsepower" column to numeric, and changing the "origin" column to a factor. We then split the data into training and testing sets. We fitted a baseline linear regression model with all original variables to predict "mpg". 
+
+To improve our baseline model, we **apply the knowledge of the in-reality relationship** between "mpg" and other variables to create a new model. We include the log transformation of "horsepower", "displacement", and "weight", the interaction between "weight" and "acceleration", and the square of time from "model year" to 1970 in the data. We then fit a new model with these variables. The new model has a higher R-squared value than the baseline model, suggesting that it is more effective in predicting "mpg". 
+
+However, the new model is not ideal as the residuals are not normally distributed and heteroscedastic. Nevertheless, the new model is still acceptable as the residuals are approximately normally distributed in the middle range and there is no autocorrelation in the residuals. Finally, we test the new model on the test set and find that it has a higher R-squared value than the baseline model, indicating that the new model is more effective in predicting "mpg".
