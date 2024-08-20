@@ -253,7 +253,7 @@ anova(model1, baseline)
 The p-value of the ANOVA test is much higher than the significance level of 0.05, indicating that the removed variables are not significant, and we can use the reduced model.
 
 
-#### Evaluate the model
+#### Model testing
 ```{r}
 predictions <- predict(model1, newdata = test_set) 
 # Actual values from the test set 
@@ -269,27 +269,42 @@ cat("Mean Squared Error (MSE):", mse, "\n")
 cat("R-squared:", r_squared, "\n")
 ```
 
-#### Validating residuals
+#### Model diagnostics
+##### Normality of residuals
+
+We now plot the Q-Q plot of the residuals to check for normality.
 
 ```{r}
 e <- model1$residuals
-hist(e, main = "Histogram of Residuals", xlab = "Residuals", breaks = 50)
-```
-
-```{r}
 qqnorm(e)
 qqline(e, col = "red")
 ```
+The Q-Q plot shows that most points lie close to the line in the center, but there are deviations at both ends (tails). This suggests that while the residuals are roughly normally distributed in the middle range, there are issues in the tails. This suggests that the normality assumption may not be fully satisfied.
 
+We perform the Shapiro-Wilk test to check for normality of the residuals.
 ```{r}
 shapiro.test(e)
 ```
+The p-value of the Shapiro-Wilk test is less than 0.05, indicating that the residuals are not normally distributed. This once again aligns with the Q-Q plot, where the residuals have heavier tails than a normal distribution.
+
+##### Homoscedasticity
+
+We also perform the Breusch-Pagan test to check for homoscedasticity.
+
 ```{r}
 bptest(model)
 ```
+The p-value of the Breusch-Pagan test is greater than 0.05, so we fail to reject the null hypothesis of homoscedasticity. We can conclude that homoscedasticity is present.
+
+##### Autocorrelation
+
+We perform the Durbin-Watson test to check for autocorrelation.
+
 ```{r}
 dwtest(model, alternative = "two.sided")
 ```
+The Durbin-Watson test gives a DW value close to 2, indicating that there is no autocorrelation.
+
 ### Quadratic model
 
 
