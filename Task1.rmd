@@ -12,7 +12,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 # Task 1
 
-## Intial setup
+## 1.1 Intial setup
 
 ### Library
 
@@ -31,7 +31,7 @@ library(dplyr)
 set.seed(200)
 ```
 
-## Reading and preprocessing data
+## 1.2 Reading and preprocessing data
 
 ### Load data
 
@@ -166,7 +166,7 @@ dim(df)
 
 The data now has 392 rows and 8 columns.
 
-## Data splitting
+## 1.3 Data splitting
 
 We split the data into training and testing sets. The ratio of the training set to the testing set is 80:20.
 
@@ -189,7 +189,7 @@ dim(train_set) # Should be approximately 80
 dim(test_set)  # Should be approximately 20
 ```
 
-## Model fitting
+## 1.4 Model fitting
 
 ### Baseline model
 
@@ -307,7 +307,7 @@ cat("R-squared:", r_squared, "\n")
 
 The R-squared is approximately 0.82, indicating that the model explains 82% of the variance in the data. This is a good result, suggesting that the model is effective in predicting "mpg". However, we believe that the absence of "horsepower" in the model is contradictory to the real-world relationship between "mpg" and "horsepower", as the more powerful the engine, the higher the fuel consumption. This suggests that the model can be improved by including "horsepower" in the model.
 
-## Improving the model
+## 1.5 Improving the model
 
 ### Adding new variables
 
@@ -520,7 +520,7 @@ cat("R-squared:", r_squared, "\n")
 
 The R-squared is approximately 0.86, which is higher than the R-squared of the baseline model. This suggests that the final model is more effective in predicting "mpg" than the baseline model.
 
-## Conclusion
+## 1.6 Conclusion
 
 In this task, we first preprocessed the data by removing the "car name" column, removing rows with missing values, converting the "horsepower" column to numeric, and changing the "origin" column to a factor. We then split the data into training and testing sets. We fitted a baseline linear regression model with all original variables to predict "mpg". 
 

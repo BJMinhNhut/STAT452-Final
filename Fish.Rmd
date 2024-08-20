@@ -1,5 +1,5 @@
 ---
-title: "STAT452 Final Project"
+title: "STAT452 Final Project - Task 2 - Fish"
 author: "Luu Quoc Bao - 22125008, Le Minh Hoang - 22125029, Le Duc Nhuan - 22125070,
   Dang Minh Nhut - 22125071"
 date: "`r Sys.Date()`"
@@ -10,103 +10,155 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## Library
+
+# Task 2B
+
+## 2B.1 Intial setup
+
+### Library
 
 ```{r}
 library(ggplot2)
-library(readxl)
 library(car)
 library(faraway)
 library(corrplot)
 library(dplyr)
+library(tidyr)
+library(lmtest)
 ```
 
-## Activity 1
+### Set seed
 
 ```{r}
 set.seed(452)
 ```
 
-### 1.1 Load and clean data
+## 2B.2 Reading and preprocessing data
+
+Data source: [kaggle](https://www.kaggle.com/datasets/vipullrathod/fish-market)
 
 ```{r}
 df <- read.csv("Fish.csv", header = TRUE)
 head(df)
 ```
+### Remove missing and duplicated rows
 
 ```{r}
-pairs(subset(df, select = -Species))
+sum(is.na(df))
 ```
-```{r}
-ggplot(df, aes(x = Height, y = Width, color = Species)) +
-  geom_point() +
-  labs(title = "Scatter Plot of Height vs Width",
-       x = "Height",
-       y = "Width") +
-  theme_minimal()
-```
-```{r}
-cor(subset(df, select = -Species))
-```
-
-```{r}
-
-# Chuyển đổi biến định tính 'Species' thành các biến giả nhưng bỏ đi một cột để tránh dư thừa
-df_encoded <- model.matrix(~Species, data=df)[, -1]
-df_encoded <- as.data.frame(df_encoded)
-
-# Ghép cột mã hóa với các cột còn lại trong dữ liệu
-df_final <- cbind(df_encoded, df[, -1])
-
-# Xem dữ liệu sau khi biến đổi
-head(df_final)
-```
-
-```{r}
-dim(df)
-```
+There is no missing values
 
 ```{r}
 sum(duplicated(df))
 ```
+There is no duplicated rows 
 
-#### Remove car names
+### Summary data
 
 ```{r}
-boxplot(df$Weight ~ df$Species,
-        main="Boxplot of Fish Weights by Species",
-        xlab="Species",
-        ylab="Weight",
-        col="lightblue")
+dim(df)
+```
+```{r}
+summary(df)
+```
+There are total 159 rows and 7 columns in the data. The columns are "Species", "Weight", "Length1", "Length2", "Length3", "Height", and "Width". "Species" is the only one qualitative variable, whereas  the other 6 variables are quantitative. The description of each column according to the [data source](https://www.kaggle.com/datasets/vipullrathod/fish-market):
+
+- `Species`: This column represents the species of the fish. It is a categorical variable that categorizes each fish into one of seven species. The species may include names like "Perch," "Bream," "Roach," "Pike," "Smelt," "Parkki," and "Whitefish." This column is the target variable for the polynomial regression analysis, where we aim to predict the fish's weight based on its other attributes.
+- `Weight`: This column represents the weight of the fish. It is a numerical variable that is typically measured in grams. The weight is the dependent variable we want to predict using polynomial regression.
+- `Length1`: This column represents the first measurement of the fish's length. It is a numerical variable, typically measured in centimetres.
+- `Length2`: This column represents the second measurement of the fish's length. It is another numerical variable, typically measured in centimetres.
+- `Length3`: This column represents the third measurement of the fish's length. Similar to the previous two columns, it is a numerical variable, usually measured in centimetres.
+- `Height`: This column represents the height of the fish. It is a numerical variable, typically measured in centimetres.
+- `Width`: This column represents the width of the fish. Like the other numerical variables, it is also typically measured in centimetres.
+
+
+### Combine length variables
+Since Length1, Length2, and Length3 are the result of three different measure times, we will calculate the average of them to have the most accurate measurement.
+```{r}
+df$Length <- (df$Length1 + df$Length2 + df$Length3)/3
+summary(df$Length)
 ```
 
-#### Histograms
-
+Now we remove old columns of Length
 ```{r}
-par(mfrow = c(2, 4))
-for (col in names(df)) {
-  if (is.numeric(df[[col]]))
-    hist(df[[col]], main = paste("Histogram of", col), xlab = col, breaks = 30)
-}
-par(mfrow = c(1, 1))
+df$Length1 <- NULL
+df$Length2 <- NULL 
+df$Length3 <- NULL
 ```
 
-#### Log Histogram
+### Histograms and Plots
 
+#### Distribution of Species
 ```{r}
-par(mfrow = c(2, 4))
-for (col in names(df)) {
-  if (is.numeric(df[[col]]))
-    hist(log(df[[col]]), main = paste("Histogram of", col), xlab = col, breaks = 30)
-}
-par(mfrow = c(1, 1))
+ggplot(df, aes(x = Species)) +
+  geom_bar(fill = "skyblue", color = "black", alpha = 0.7) +
+  theme_minimal() +
+  labs(title = "Distribution of Fish Species", x = "Species", y = "Count") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
+We can see that Perch and Bream have more appearance in the dataset than other species.
 
-
-#### Boxplots & remove outliers
+#### Histogram of numeric columns
 
 ```{r}
-par(mfrow = c(2, 4))
+df_long <- subset(df, select = -c(Species)) %>%
+  pivot_longer(cols = everything(), names_to = "variable", values_to = "value")
+
+# Plotting histograms for all variables
+ggplot(df_long, aes(x = value)) +
+  geom_histogram(fill = "skyblue", color = "black", alpha = 0.7, bins=50) +
+  facet_wrap(~variable, scales = "free") +
+  theme_minimal() +
+  labs(title = "Histograms of All Variables in df", x = "Value", y = "Frequency")
+```
+The histograms are not "smooth", so that seems like the distributions of length, height, and width are different among species. So we are going to research it.
+
+#### Height by Species
+```{r}
+ggplot(df, aes(x = Species, y = Height)) +
+  geom_boxplot(fill = "skyblue", color = "black", alpha = 0.7) +
+  theme_minimal() +
+  labs(title = "Height Distribution by Species", x = "Species", y = "Height") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+The boxplot suggests that Parkki, Perch, Pike, and Roach species has relatively small different in height. On the other hand, Smelt seems to have the smallest height, and Bream has largest height.
+
+#### Width by Species 
+```{r}
+ggplot(df, aes(x = Species, y = Width)) +
+  geom_boxplot(fill = "skyblue", color = "black", alpha = 0.7) +
+  theme_minimal() +
+  labs(title = "Width Distribution by Species", x = "Species", y = "Width") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+The boxplot suggests that Bream, Pike, and Whitefish species have the largest width. On the other hand, Smelt has the smallest width. 
+
+#### Length by Species
+```{r}
+ggplot(df, aes(x = Species, y = Length)) +
+  geom_boxplot(fill = "skyblue", color = "black", alpha = 0.7) +
+  theme_minimal() +
+  labs(title = "Length Distribution by Species", x = "Species", y = "Length") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+The boxplot suggests that Pike species has the largest length. On the other hand, Smelt has the smallest width. 
+
+#### Weight by Species
+From 3 diagrams above, we can expect that Smelt is the smallest fish and hence has the smallest weight. And Pike, Bream might have the largest weight, since their size measurements are larger than the others.
+
+The following boxplot confirms that.
+
+```{r}
+ggplot(df, aes(x = Species, y = Weight)) +
+  geom_boxplot(fill = "skyblue", color = "black", alpha = 0.7) +
+  theme_minimal() +
+  labs(title = "Weight Distribution by Species", x = "Species", y = "Weight") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+#### Boxplots and outliers detection 
+```{r}
+par(mfrow = c(1, 4))
 
 for (col in names(df)) {
   if (is.numeric(df[[col]]))
@@ -115,44 +167,21 @@ for (col in names(df)) {
 
 par(mfrow = c(1, 1))
 ```
+The box plots suggest that there are not many outliers in the variables' distributions. So we will not process any outliers removal.  
 
+## 2B.3 Data splitting
+
+### Convert Species to factor
+We convert Species to factor allowing the linear regression model to use each separate value of the column as an independent variable. Since each Species may have unique signatures that affects the Weight.
 ```{r}
-# Function to remove outliers using IQR for a single column
-identify_outliers_IQR <- function(x) {
-  Q1 <- quantile(x, 0.25)
-  Q3 <- quantile(x, 0.75)
-  IQR <- Q3 - Q1
-  lower_bound <- Q1 - 1.5 * IQR
-  upper_bound <- Q3 + 1.5 * IQR
-  !(x >= lower_bound & x <= upper_bound)
-}
-
-# Identify outliers for each numeric column
-outlier_matrix <- df %>%
-  select(where(is.numeric)) %>%
-  mutate(across(everything(), identify_outliers_IQR))
-
-# Filter out rows with any outlier
-df_clean <- df[!apply(outlier_matrix, 1, any), ]
-
-dim(df_clean)
+df$Species <- as.factor(df$Species)
 ```
 
-```{r}
-par(mfrow = c(2, 4))
+### Split
 
-for (col in names(df_clean)) {
-  if (is.numeric(df_clean[[col]]))
-    boxplot(df_clean[col], main = col)
-}
-
-par(mfrow = c(1, 1))
-```
-
-### 1.2 Split data
+We split the data into training and testing sets. The ratio of the training set to the testing set is 80:20.
 
 ```{r}
-df = df_final
 # Define the split ratio
 train_ratio <- 0.8
 
@@ -169,82 +198,64 @@ test_set <- df[-train_indices, ]
 # Display the number of rows in each set
 dim(train_set) # Should be approximately 80
 dim(test_set)  # Should be approximately 20
-train_set
 ```
 
-### 1.3 Model
-
-#### Collinearity
-
-```{r}
-model_full <- lm(Weight ~ ., data = train_set)
-summary(model_full)
-```
+## 2B.3 Model fitting
+### Baseline model
+We fit a linear regression model with all original variables to predict "Weight".
 
 ```{r}
-car::vif(model_full)
+baseline <- lm(Weight ~ ., data = train_set)
+summary(baseline)
 ```
-```{r}
-model = update(model_full, . ~ . - Length2)
-car::vif(model)
-```
+The T tests for significant of each variables show that there is some insignificant variables that we can remove. 
+
+### Multicollinearity
+We now check for multicollinearity to consider removing highly correlated variables.
+
+#### Correlation matrix
 
 ```{r}
-model = update(model, . ~ . - Length3)
-car::vif(model)
+corrplot(cor(subset(df, select = -Species)), method = "number")
 ```
+We can see that Length is highly correlated to Width (0.87), so we should consider removing one of them from the model.
+
+#### VIF scores 
+We calculate the Variance Inflation Factor (VIF) of the variables.
+```{r}
+vif(baseline)
+```
+"Height" variable has the highest VIF value and greater than 10. Therefore, we will remove it from the model.
 
 ```{r}
-model = update(model, . ~ . - Height)
-car::vif(model)
+model1<-update(baseline, . ~ . -Height)
+vif(model1)
 ```
-```{r}
-model = update(model, . ~ . - Length1)
-car::vif(model)
-```
+"Length" variable has the highest VIF value and greater than 10. Therefore, we will remove it from the model.
 
 ```{r}
-model_bw <- step(model, data = train_set, direction = "both")
+model1<-update(model1, . ~ . -Length)
+vif(model1)
 ```
 
-```{r}
-summary(model_bw)
-```
+### First degree model
+
 
 ```{r}
-model <- model_bw
-summary(model)
+model1 <- step(model, direction="backward")
+summary(model1)
 ```
+The step-wise search does not remove any variable, so we test the reduced model after using VIF scores and the full baseline model at beginning. 
 
 ```{r}
-car::vif(model)
+anova(model1, baseline)
 ```
-```{r}
-plot(df_final$Width, df_final$Weight,
-     main = "Scatter Plot of Fish Weight vs. Length1",
-     xlab = "Length1",
-     ylab = "Weight",
-     pch = 19,       # Kiểu điểm
-     col = "blue")   # Màu sắc điểm
-```
+The p-value of the ANOVA test is much higher than the significance level of 0.05, indicating that the removed variables are not significant, and we can use the reduced model.
+
 
 #### Evaluate the model
 ```{r}
-# Dự đoán trên tập test với mô hình tối ưu
-predictions <- predict(model, newdata = test_set)
-
-# Tính toán các chỉ số đánh giá
-mse <- mean((test_set$Weight - predictions)^2)
-r_squared <- 1 - (sum((test_set$Weight - predictions)^2) / sum((test_set$Weight - mean(test_set$Weight))^2))
-
-# In ra các chỉ số
-cat("MSE:", mse, "\n")
-cat("R-squared:", r_squared, "\n")
-
-```
-
-```{r}
-predictions <- predict(model, newdata = test_set) 
+predictions <- predict(model1, newdata = test_set) 
 # Actual values from the test set 
 actual_values <- test_set$Weight
 # Calculate Mean Squared Error (MSE) 
@@ -253,15 +264,16 @@ mse <- mean((predictions - actual_values)^2)
 rss <- sum((predictions - actual_values)^2) 
 tss <- sum((actual_values - mean(actual_values))^2) 
 r_squared <- 1 - (rss / tss)  
-# Print metrics cat("Mean Squared Error (MSE):", mse, "\n") 
+# Print metrics 
+cat("Mean Squared Error (MSE):", mse, "\n") 
 cat("R-squared:", r_squared, "\n")
 ```
 
 #### Validating residuals
 
 ```{r}
-e <- predictions - actual_values
-hist(e, main = "Histogram of Residuals", xlab = "Residuals", breaks = 30)
+e <- model1$residuals
+hist(e, main = "Histogram of Residuals", xlab = "Residuals", breaks = 50)
 ```
 
 ```{r}
@@ -273,16 +285,39 @@ qqline(e, col = "red")
 shapiro.test(e)
 ```
 ```{r}
-library(lmtest)
 bptest(model)
 ```
 ```{r}
 dwtest(model, alternative = "two.sided")
 ```
+### Quadratic model
+
 
 ```{r}
 shapiro.test(model$residuals)
 ```
+
+```{r}
+ggplot(df, aes(x = Height, y = Width, color = Species)) +
+  geom_point() +
+  labs(title = "Scatter Plot of Height vs Width",
+       x = "Height",
+       y = "Width") +
+  theme_minimal()
+```
+
+
+
+
+```{r}
+plot(df_final$Width, df_final$Weight,
+     main = "Scatter Plot of Fish Weight vs. Length1",
+     xlab = "Length1",
+     ylab = "Weight",
+     pch = 19,       # Kiểu điểm
+     col = "blue")   # Màu sắc điểm
+```
+
 
 
 ```{r}
