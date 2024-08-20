@@ -205,8 +205,8 @@ dim(test_set)  # Should be approximately 20
 We fit a linear regression model with all original variables to predict "Weight".
 
 ```{r}
-baseline <- lm(Weight ~ ., data = train_set)
-summary(baseline)
+model1_baseline <- lm(Weight ~ ., data = train_set)
+summary(model1_baseline)
 ```
 The T tests for significant of each variables show that there is some insignificant variables that we can remove. 
 
@@ -223,34 +223,48 @@ We can see that Length is highly correlated to Width (0.87), so we should consid
 #### VIF scores 
 We calculate the Variance Inflation Factor (VIF) of the variables.
 ```{r}
-vif(baseline)
+vif(model1_baseline)
 ```
 "Height" variable has the highest VIF value and greater than 10. Therefore, we will remove it from the model.
 
 ```{r}
-model1<-update(baseline, . ~ . -Height)
-vif(model1)
+model1_vif<-update(model1_baseline, . ~ . -Height)
+vif(model1_vif)
 ```
 "Length" variable has the highest VIF value and greater than 10. Therefore, we will remove it from the model.
 
 ```{r}
-model1<-update(model1, . ~ . -Length)
-vif(model1)
+model1_vif<-update(model1_vif, . ~ . -Length)
+vif(model1_vif)
 ```
 
 ### First degree model
 
+```{r}
+summary(model1_vif)
+```
+
 
 ```{r}
-model1 <- step(model, direction="backward")
-summary(model1)
+model1_step <- step(model1_baseline, direction="backward")
+summary(model1_step)
 ```
-The step-wise search does not remove any variable, so we test the reduced model after using VIF scores and the full baseline model at beginning. The T test of SpeciesPike, SpeciesSmelt align with our expectation since these two species have the most significant different in "Weight" among all species.
+The T test of SpeciesPike, SpeciesSmelt align with our expectation since these two species have the most significant different in "Weight" among all species.
+
 
 ```{r}
-anova(model1, baseline)
+anova(model1_vif, model1_baseline)
 ```
-The p-value of the ANOVA test is much higher than the significance level of 0.05, indicating that the removed variables are not significant, and we can use the reduced model.
+The p-value of the ANOVA test is much less than the significance level of 0.05, indicating that the removed variables are significant, so we should not use `model1_vif`.
+
+```{r}
+anova(model1_step, model1_baseline)
+```
+The p-value of the ANOVA test is much higher than the significance level of 0.05, indicating that the removed variables are not significant, and we can use `model1_step`.
+
+```{r}
+model1 <- model1_step
+```
 
 
 #### Model testing
@@ -292,7 +306,7 @@ The p-value of the Shapiro-Wilk test is less than 0.05, indicating that the resi
 We also perform the Breusch-Pagan test to check for homoscedasticity.
 
 ```{r}
-bptest(model)
+bptest(model1)
 ```
 The p-value of the Breusch-Pagan test is greater than 0.05, so we fail to reject the null hypothesis of homoscedasticity. We can conclude that homoscedasticity is present.
 
@@ -301,7 +315,7 @@ The p-value of the Breusch-Pagan test is greater than 0.05, so we fail to reject
 We perform the Durbin-Watson test to check for autocorrelation.
 
 ```{r}
-dwtest(model, alternative = "two.sided")
+dwtest(model1, alternative = "two.sided")
 ```
 The Durbin-Watson test gives a DW value close to 2, indicating that there is no autocorrelation.
 
@@ -397,16 +411,16 @@ The p-value of the Shapiro-Wilk test is less than 0.05, indicating that the resi
 We also perform the Breusch-Pagan test to check for homoscedasticity.
 
 ```{r}
-bptest(model)
+bptest(model2)
 ```
-The p-value of the Breusch-Pagan test is greater than 0.05, so we fail to reject the null hypothesis of homoscedasticity. We can conclude that homoscedasticity is present.
+The p-value of the Breusch-Pagan test is much smaller than 0.05, so we reject the null hypothesis of homoscedasticity. We can conclude that heteroscedasticity is present.
 
 ##### Autocorrelation
 
 We perform the Durbin-Watson test to check for autocorrelation.
 
 ```{r}
-dwtest(model, alternative = "two.sided")
+dwtest(model2, alternative = "two.sided")
 ```
 The Durbin-Watson test gives a DW value close to 2, indicating that there is no autocorrelation.
 
@@ -414,6 +428,6 @@ The Durbin-Watson test gives a DW value close to 2, indicating that there is no 
 ```{r}
 anova(model1, model2)
 ```
-The p-value of the ANOVA test is extremely than the significance level of 0.05, indicating that the removed variables are significant, and we should use the second model.
+The p-value of the ANOVA test is extremely smaller than the significance level of 0.05, indicating that the added variables into model2 are significant, and we should use model2 since model2 fits the data better.
 
 ## 2B.5 Conclusion
