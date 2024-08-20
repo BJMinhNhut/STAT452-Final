@@ -431,3 +431,8 @@ anova(model1, model2)
 The p-value of the ANOVA test is extremely smaller than the significance level of 0.05, indicating that the added variables into model2 are significant, and we should use model2 since model2 fits the data better.
 
 ## 2B.5 Conclusion
+In this task, we first preprocessed the data by combining the "Length" column, and changing the "Species" column to a factor. We then split the data into training and testing sets. We fitted a baseline linear regression model with all original variables to predict "Weight". 
+
+To improve our baseline model, we **apply the observation achieved from scatter plots** between the predictors and the target to create a new model. We include the full quadratic model of (Length, Height, Width) and add the dummy variables of "Species". Then we run the model through a backward stepwise search to keep significant variables.
+
+However, both of the models is not ideal as the residuals are not normally distributed and heteroscedastic. Nevertheless, the second model is still acceptable as the residuals are approximately normally distributed in the middle range and there is no autocorrelation in the residuals. Finally, we test the new quadratic model on the test set and find that it has a higher R-squared value than the linear model (0.963937 compares to 0.9160474), indicating that the new model is more effective in predicting "Weight", the ANOVA test confirms that.

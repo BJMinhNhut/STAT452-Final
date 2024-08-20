@@ -1173,6 +1173,23 @@ data better.</p>
 </div>
 <div id="b.5-conclusion" class="section level2">
 <h2>2B.5 Conclusion</h2>
+<p>In this task, we first preprocessed the data by combining the
+“Length” column, and changing the “Species” column to a factor. We then
+split the data into training and testing sets. We fitted a baseline
+linear regression model with all original variables to predict
+“Weight”.</p>
+<p>To improve our baseline model, we <strong>apply the observation
+achieved from scatter plots</strong> between the predictors and the
+target to create a new model. We include the full quadratic model of
+(Length, Height, Width) and add the dummy variables of “Species”.</p>
+<p>However, both of the models is not ideal as the residuals are not
+normally distributed and heteroscedastic. Nevertheless, the second model
+is still acceptable as the residuals are approximately normally
+distributed in the middle range and there is no autocorrelation in the
+residuals. Finally, we test the new quadratic model on the test set and
+find that it has a higher R-squared value than the linear model
+(0.963937 compares to 0.9160474), indicating that the new model is more
+effective in predicting “Weight”, the ANOVA test confirms that.</p>
 </div>
 </div>
 
