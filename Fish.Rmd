@@ -200,7 +200,7 @@ dim(train_set) # Should be approximately 80
 dim(test_set)  # Should be approximately 20
 ```
 
-## 2B.3 Model fitting
+## 2B.4 Model fitting
 ### Baseline model
 We fit a linear regression model with all original variables to predict "Weight".
 
@@ -245,7 +245,7 @@ vif(model1)
 model1 <- step(model, direction="backward")
 summary(model1)
 ```
-The step-wise search does not remove any variable, so we test the reduced model after using VIF scores and the full baseline model at beginning. 
+The step-wise search does not remove any variable, so we test the reduced model after using VIF scores and the full baseline model at beginning. The T test of SpeciesPike, SpeciesSmelt align with our expectation since these two species have the most significant different in "Weight" among all species.
 
 ```{r}
 anova(model1, baseline)
@@ -307,69 +307,60 @@ The Durbin-Watson test gives a DW value close to 2, indicating that there is no 
 
 ### Quadratic model
 
+#### Plots
+Consider the scatter plots between Length, Width, Height and Weights. We can see that a curve (polynomial regression) fits the data better than a linear line.
 
 ```{r}
-shapiro.test(model$residuals)
+pairs(subset(df, select = - Species))
+```
+##### Width and Weight
+```{r}
+ggplot(df, aes(x = Width, y = Weight)) +
+  geom_point(color = "blue", alpha = 0.6) +
+  geom_smooth(method = "lm", formula = y ~ I(x^2), color = "red", se = FALSE) +
+  theme_minimal() +
+  labs(title = "Scatter Plot: Width vs Weight", x = "Width", y = "Weight")
 ```
 
+##### Length and Weight
 ```{r}
-ggplot(df, aes(x = Height, y = Width, color = Species)) +
-  geom_point() +
-  labs(title = "Scatter Plot of Height vs Width",
-       x = "Height",
-       y = "Width") +
-  theme_minimal()
+ggplot(df, aes(x = Length, y = Weight)) +
+  geom_point(color = "blue", alpha = 0.6) +
+  geom_smooth(method = "lm", formula = y ~ I(x^2), color = "red", se = FALSE) +
+  theme_minimal() +
+  labs(title = "Scatter Plot: Length vs Weight", x = "Length", y = "Weight")
 ```
 
-
-
-
+##### Height and Weight
 ```{r}
-plot(df_final$Width, df_final$Weight,
-     main = "Scatter Plot of Fish Weight vs. Length1",
-     xlab = "Length1",
-     ylab = "Weight",
-     pch = 19,       # Kiểu điểm
-     col = "blue")   # Màu sắc điểm
+ggplot(df, aes(x = Height, y = Weight)) +
+  geom_point(color = "blue", alpha = 0.6) +
+  geom_smooth(method = "lm", formula = y ~ I(x^2), color = "red", se = FALSE) +
+  theme_minimal() +
+  labs(title = "Scatter Plot: Height vs Weight", x = "Height", y = "Weight")
 ```
 
-
+#### Selecting variables
+We consider the quadratic regression model with all variables
 
 ```{r}
-new_model = lm(Weight ~ . + I(Width^2) + I(Length1^2), data = train_set)
-summary(new_model)
+model2_baseline <- lm(Weight ~ Species + Length + Width + Height + I(Length^2) + I(Width^2) + I(Height^2) + I(Width * Height) + I(Width*Length) + I(Height*Length), data = train_set) 
+summary(model2_baseline)
 ```
+We perform stepwise search to remove insignificant variables.
 
 ```{r}
-car::vif(new_model)
+model2 <- step(model2_baseline, direction = "backward")
+summary(model2)
 ```
 ```{r}
-new_model = update(model, . ~ . - Width  + I(Width*Height*Length1), data = train_set)
-summary(new_model)
+anova(model2, model2_baseline)
 ```
+The p-value of the ANOVA test is much higher than the significance level of 0.05, indicating that the removed variables are not significant, and we can use the reduced model.
 
+#### Model testing
 ```{r}
-car::vif(new_model)
-```
-
-#### Evaluate the model
-```{r}
-model = new_model
-# Dự đoán trên tập test với mô hình tối ưu
-predictions <- predict(model, newdata = test_set)
-
-# Tính toán các chỉ số đánh giá
-mse <- mean((test_set$Weight - predictions)^2)
-r_squared <- 1 - (sum((test_set$Weight - predictions)^2) / sum((test_set$Weight - mean(test_set$Weight))^2))
-
-# In ra các chỉ số
-cat("MSE:", mse, "\n")
-cat("R-squared:", r_squared, "\n")
-
-```
-
-```{r}
-predictions <- predict(model, newdata = test_set) 
+predictions <- predict(model2, newdata = test_set) 
 # Actual values from the test set 
 actual_values <- test_set$Weight
 # Calculate Mean Squared Error (MSE) 
@@ -378,62 +369,51 @@ mse <- mean((predictions - actual_values)^2)
 rss <- sum((predictions - actual_values)^2) 
 tss <- sum((actual_values - mean(actual_values))^2) 
 r_squared <- 1 - (rss / tss)  
-# Print metrics cat("Mean Squared Error (MSE):", mse, "\n") 
+# Print metrics 
+cat("Mean Squared Error (MSE):", mse, "\n") 
 cat("R-squared:", r_squared, "\n")
 ```
 
-#### Validating residuals
+#### Model diagnostics
+##### Normality of residuals
+
+We now plot the Q-Q plot of the residuals to check for normality.
 
 ```{r}
-e <- predictions - actual_values
-hist(e, main = "Histogram of Residuals", xlab = "Residuals", breaks = 30)
-```
-
-```{r}
+e <- model2$residuals
 qqnorm(e)
 qqline(e, col = "red")
 ```
+The Q-Q plot shows that most points lie close to the line in the center, but there are deviations at both ends (tails). This suggests that while the residuals are roughly normally distributed in the middle range, there are issues in the tails. This suggests that the normality assumption may not be fully satisfied.
 
+We perform the Shapiro-Wilk test to check for normality of the residuals.
 ```{r}
 shapiro.test(e)
 ```
+The p-value of the Shapiro-Wilk test is less than 0.05, indicating that the residuals are not normally distributed. This once again aligns with the Q-Q plot, where the residuals have heavier tails than a normal distribution.
+
+##### Homoscedasticity
+
+We also perform the Breusch-Pagan test to check for homoscedasticity.
+
 ```{r}
-library(lmtest)
 bptest(model)
 ```
+The p-value of the Breusch-Pagan test is greater than 0.05, so we fail to reject the null hypothesis of homoscedasticity. We can conclude that homoscedasticity is present.
+
+##### Autocorrelation
+
+We perform the Durbin-Watson test to check for autocorrelation.
+
 ```{r}
 dwtest(model, alternative = "two.sided")
 ```
+The Durbin-Watson test gives a DW value close to 2, indicating that there is no autocorrelation.
 
+### Compare with the first model
 ```{r}
-shapiro.test(model$residuals)
+anova(model1, model2)
 ```
+The p-value of the ANOVA test is extremely than the significance level of 0.05, indicating that the removed variables are significant, and we should use the second model.
 
-
-
-```{r}
-model1 = lm(Weight ~ . + poly(Height, Length1, Width, degree = 2) - Length1 - Length2 - Length3 - Height - Width, data = train_set)
-summary(model1)
-```
-```{r}
-model1 = lm(Weight ~ . -Length1 - Length2 - Length3 + I(Length1^2) + Width + I(Length1*Width) + I(Width^2) + Height + I(Height^2) + I(Height*Width), data = train_set)
-summary(model1)
-```
-
-```{r}
-model1 <- step(model1, data = train_set, direction = "both")
-summary(model1)
-```
-```{r}
-model1 = update(model1, . ~ . - SpeciesSmelt)
-summary(model1)
-```
-
-```{r}
-model1 = update(model1, . ~ . - Height)
-summary(model1)
-```
-
-```{r}
-car::vif(model1)
-```
+## 2B.5 Conclusion
