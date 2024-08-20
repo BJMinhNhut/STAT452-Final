@@ -11,9 +11,9 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 
-# Task 2B
+# Task 2.1
 
-## 2B.1 Intial setup
+## 2.1.1 Intial setup
 
 ### Library
 
@@ -33,7 +33,7 @@ library(lmtest)
 set.seed(452)
 ```
 
-## 2B.2 Reading and preprocessing data
+## 2.1.2 Reading and preprocessing data
 
 Data source: [kaggle](https://www.kaggle.com/datasets/vipullrathod/fish-market)
 
@@ -169,7 +169,7 @@ par(mfrow = c(1, 1))
 ```
 The box plots suggest that there are not many outliers in the variables' distributions. So we will not process any outliers removal.  
 
-## 2B.3 Data splitting
+## 2.1.3 Data splitting
 
 ### Convert Species to factor
 We convert Species to factor allowing the linear regression model to use each separate value of the column as an independent variable. Since each Species may have unique signatures that affects the Weight.
@@ -200,7 +200,7 @@ dim(train_set) # Should be approximately 80
 dim(test_set)  # Should be approximately 20
 ```
 
-## 2B.4 Model fitting
+## 2.1.4 Model fitting
 ### Baseline model
 We fit a linear regression model with all original variables to predict "Weight".
 
@@ -279,7 +279,6 @@ rss <- sum((predictions - actual_values)^2)
 tss <- sum((actual_values - mean(actual_values))^2) 
 r_squared <- 1 - (rss / tss)  
 # Print metrics 
-cat("Mean Squared Error (MSE):", mse, "\n") 
 cat("R-squared:", r_squared, "\n")
 ```
 
@@ -384,7 +383,6 @@ rss <- sum((predictions - actual_values)^2)
 tss <- sum((actual_values - mean(actual_values))^2) 
 r_squared <- 1 - (rss / tss)  
 # Print metrics 
-cat("Mean Squared Error (MSE):", mse, "\n") 
 cat("R-squared:", r_squared, "\n")
 ```
 
@@ -430,7 +428,7 @@ anova(model1, model2)
 ```
 The p-value of the ANOVA test is extremely smaller than the significance level of 0.05, indicating that the added variables into model2 are significant, and we should use model2 since model2 fits the data better.
 
-## 2B.5 Conclusion
+## 2.1.5 Conclusion
 In this task, we first preprocessed the data by combining the "Length" column, and changing the "Species" column to a factor. We then split the data into training and testing sets. We fitted a baseline linear regression model with all original variables to predict "Weight". 
 
 To improve our baseline model, we **apply the observation achieved from scatter plots** between the predictors and the target to create a new model. We include the full quadratic model of (Length, Height, Width) and add the dummy variables of "Species". Then we run the model through a backward stepwise search to keep significant variables.
