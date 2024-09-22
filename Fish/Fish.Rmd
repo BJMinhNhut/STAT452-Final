@@ -1,0 +1,436 @@
+---
+title: "STAT452 Final Project - Task 2 - Fish"
+author: "Luu Quoc Bao - 22125008, Le Minh Hoang - 22125029, Le Duc Nhuan - 22125070,
+  Dang Minh Nhut - 22125071"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+# Task 2.1
+
+## 2.1.1 Intial setup
+
+### Library
+
+```{r}
+library(ggplot2)
+library(car)
+library(faraway)
+library(corrplot)
+library(dplyr)
+library(tidyr)
+library(lmtest)
+```
+
+### Set seed
+
+```{r}
+set.seed(452)
+```
+
+## 2.1.2 Reading and preprocessing data
+
+Data source: [kaggle](https://www.kaggle.com/datasets/vipullrathod/fish-market)
+
+```{r}
+df <- read.csv("Fish.csv", header = TRUE)
+head(df)
+```
+### Remove missing and duplicated rows
+
+```{r}
+sum(is.na(df))
+```
+There is no missing values
+
+```{r}
+sum(duplicated(df))
+```
+There is no duplicated rows 
+
+### Summary data
+
+```{r}
+dim(df)
+```
+```{r}
+summary(df)
+```
+There are total 159 rows and 7 columns in the data. The columns are "Species", "Weight", "Length1", "Length2", "Length3", "Height", and "Width". "Species" is the only one qualitative variable, whereas  the other 6 variables are quantitative. The description of each column according to the [data source](https://www.kaggle.com/datasets/vipullrathod/fish-market):
+
+- `Species`: This column represents the species of the fish. It is a categorical variable that categorizes each fish into one of seven species. The species may include names like "Perch," "Bream," "Roach," "Pike," "Smelt," "Parkki," and "Whitefish." This column is the target variable for the polynomial regression analysis, where we aim to predict the fish's weight based on its other attributes.
+- `Weight`: This column represents the weight of the fish. It is a numerical variable that is typically measured in grams. The weight is the dependent variable we want to predict using polynomial regression.
+- `Length1`: This column represents the first measurement of the fish's length. It is a numerical variable, typically measured in centimetres.
+- `Length2`: This column represents the second measurement of the fish's length. It is another numerical variable, typically measured in centimetres.
+- `Length3`: This column represents the third measurement of the fish's length. Similar to the previous two columns, it is a numerical variable, usually measured in centimetres.
+- `Height`: This column represents the height of the fish. It is a numerical variable, typically measured in centimetres.
+- `Width`: This column represents the width of the fish. Like the other numerical variables, it is also typically measured in centimetres.
+
+
+### Combine length variables
+Since Length1, Length2, and Length3 are the result of three different measure times, we will calculate the average of them to have the most accurate measurement.
+```{r}
+df$Length <- (df$Length1 + df$Length2 + df$Length3)/3
+summary(df$Length)
+```
+
+Now we remove old columns of Length
+```{r}
+df$Length1 <- NULL
+df$Length2 <- NULL 
+df$Length3 <- NULL
+```
+
+### Histograms and Plots
+
+#### Distribution of Species
+```{r}
+ggplot(df, aes(x = Species)) +
+  geom_bar(fill = "skyblue", color = "black", alpha = 0.7) +
+  theme_minimal() +
+  labs(title = "Distribution of Fish Species", x = "Species", y = "Count") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+We can see that Perch and Bream have more appearance in the dataset than other species.
+
+#### Histogram of numeric columns
+
+```{r}
+df_long <- subset(df, select = -c(Species)) %>%
+  pivot_longer(cols = everything(), names_to = "variable", values_to = "value")
+
+# Plotting histograms for all variables
+ggplot(df_long, aes(x = value)) +
+  geom_histogram(fill = "skyblue", color = "black", alpha = 0.7, bins=50) +
+  facet_wrap(~variable, scales = "free") +
+  theme_minimal() +
+  labs(title = "Histograms of All Variables in df", x = "Value", y = "Frequency")
+```
+The histograms are not "smooth", so that seems like the distributions of length, height, and width are different among species. So we are going to research it.
+
+#### Height by Species
+```{r}
+ggplot(df, aes(x = Species, y = Height)) +
+  geom_boxplot(fill = "skyblue", color = "black", alpha = 0.7) +
+  theme_minimal() +
+  labs(title = "Height Distribution by Species", x = "Species", y = "Height") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+The boxplot suggests that Parkki, Perch, Pike, and Roach species has relatively small different in height. On the other hand, Smelt seems to have the smallest height, and Bream has largest height.
+
+#### Width by Species 
+```{r}
+ggplot(df, aes(x = Species, y = Width)) +
+  geom_boxplot(fill = "skyblue", color = "black", alpha = 0.7) +
+  theme_minimal() +
+  labs(title = "Width Distribution by Species", x = "Species", y = "Width") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+The boxplot suggests that Bream, Pike, and Whitefish species have the largest width. On the other hand, Smelt has the smallest width. 
+
+#### Length by Species
+```{r}
+ggplot(df, aes(x = Species, y = Length)) +
+  geom_boxplot(fill = "skyblue", color = "black", alpha = 0.7) +
+  theme_minimal() +
+  labs(title = "Length Distribution by Species", x = "Species", y = "Length") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+The boxplot suggests that Pike species has the largest length. On the other hand, Smelt has the smallest width. 
+
+#### Weight by Species
+From 3 diagrams above, we can expect that Smelt is the smallest fish and hence has the smallest weight. And Pike, Bream might have the largest weight, since their size measurements are larger than the others.
+
+The following boxplot confirms that.
+
+```{r}
+ggplot(df, aes(x = Species, y = Weight)) +
+  geom_boxplot(fill = "skyblue", color = "black", alpha = 0.7) +
+  theme_minimal() +
+  labs(title = "Weight Distribution by Species", x = "Species", y = "Weight") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+#### Boxplots and outliers detection 
+```{r}
+par(mfrow = c(1, 4))
+
+for (col in names(df)) {
+  if (is.numeric(df[[col]]))
+    boxplot(df[col], main = col)
+}
+
+par(mfrow = c(1, 1))
+```
+The box plots suggest that there are not many outliers in the variables' distributions. So we will not process any outliers removal.  
+
+## 2.1.3 Data splitting
+
+### Convert Species to factor
+We convert Species to factor allowing the linear regression model to use each separate value of the column as an independent variable. Since each Species may have unique signatures that affects the Weight.
+```{r}
+df$Species <- as.factor(df$Species)
+```
+
+### Split
+
+We split the data into training and testing sets. The ratio of the training set to the testing set is 80:20.
+
+```{r}
+# Define the split ratio
+train_ratio <- 0.8
+
+# Determine the number of rows in the training set
+train_size <- floor(train_ratio * nrow(df))
+
+# Randomly sample row indices for the training set
+train_indices <- sample(seq_len(nrow(df)), size = train_size)
+
+# Split the data into training and testing sets
+train_set <- df[train_indices, ]
+test_set <- df[-train_indices, ]
+
+# Display the number of rows in each set
+dim(train_set) # Should be approximately 80
+dim(test_set)  # Should be approximately 20
+```
+
+## 2.1.4 Model fitting
+### Baseline model
+We fit a linear regression model with all original variables to predict "Weight".
+
+```{r}
+model1_baseline <- lm(Weight ~ ., data = train_set)
+summary(model1_baseline)
+```
+The T tests for significant of each variables show that there is some insignificant variables that we can remove. 
+
+### Multicollinearity
+We now check for multicollinearity to consider removing highly correlated variables.
+
+#### Correlation matrix
+
+```{r}
+corrplot(cor(subset(df, select = -Species)), method = "number")
+```
+We can see that Length is highly correlated to Width (0.87), so we should consider removing one of them from the model.
+
+#### VIF scores 
+We calculate the Variance Inflation Factor (VIF) of the variables.
+```{r}
+vif(model1_baseline)
+```
+"Height" variable has the highest VIF value and greater than 10. Therefore, we will remove it from the model.
+
+```{r}
+model1_vif<-update(model1_baseline, . ~ . -Height)
+vif(model1_vif)
+```
+"Length" variable has the highest VIF value and greater than 10. Therefore, we will remove it from the model.
+
+```{r}
+model1_vif<-update(model1_vif, . ~ . -Length)
+vif(model1_vif)
+```
+
+### First degree model
+
+```{r}
+summary(model1_vif)
+```
+
+
+```{r}
+model1_step <- step(model1_baseline, direction="backward")
+summary(model1_step)
+```
+The T test of SpeciesPike, SpeciesSmelt align with our expectation since these two species have the most significant different in "Weight" among all species.
+
+
+```{r}
+anova(model1_vif, model1_baseline)
+```
+The p-value of the ANOVA test is much less than the significance level of 0.05, indicating that the removed variables are significant, so we should not use `model1_vif`.
+
+```{r}
+anova(model1_step, model1_baseline)
+```
+The p-value of the ANOVA test is much higher than the significance level of 0.05, indicating that the removed variables are not significant, and we can use `model1_step`.
+
+```{r}
+model1 <- model1_step
+```
+
+
+#### Model testing
+```{r}
+predictions <- predict(model1, newdata = test_set) 
+# Actual values from the test set 
+actual_values <- test_set$Weight
+# Calculate Mean Squared Error (MSE) 
+mse <- mean((predictions - actual_values)^2)  
+# Calculate R-squared 
+rss <- sum((predictions - actual_values)^2) 
+tss <- sum((actual_values - mean(actual_values))^2) 
+r_squared <- 1 - (rss / tss)  
+# Print metrics 
+cat("R-squared:", r_squared, "\n")
+```
+
+#### Model diagnostics
+##### Normality of residuals
+
+We now plot the Q-Q plot of the residuals to check for normality.
+
+```{r}
+e <- model1$residuals
+qqnorm(e)
+qqline(e, col = "red")
+```
+The Q-Q plot shows that most points lie close to the line in the center, but there are deviations at both ends (tails). This suggests that while the residuals are roughly normally distributed in the middle range, there are issues in the tails. This suggests that the normality assumption may not be fully satisfied.
+
+We perform the Shapiro-Wilk test to check for normality of the residuals.
+```{r}
+shapiro.test(e)
+```
+The p-value of the Shapiro-Wilk test is less than 0.05, indicating that the residuals are not normally distributed. This once again aligns with the Q-Q plot, where the residuals have heavier tails than a normal distribution.
+
+##### Homoscedasticity
+
+We also perform the Breusch-Pagan test to check for homoscedasticity.
+
+```{r}
+bptest(model1)
+```
+The p-value of the Breusch-Pagan test is greater than 0.05, so we fail to reject the null hypothesis of homoscedasticity. We can conclude that homoscedasticity is present.
+
+##### Autocorrelation
+
+We perform the Durbin-Watson test to check for autocorrelation.
+
+```{r}
+dwtest(model1, alternative = "two.sided")
+```
+The Durbin-Watson test gives a DW value close to 2, indicating that there is no autocorrelation.
+
+### Quadratic model
+
+#### Plots
+Consider the scatter plots between Length, Width, Height and Weights. We can see that a curve (polynomial regression) fits the data better than a linear line.
+
+```{r}
+pairs(subset(df, select = - Species))
+```
+##### Width and Weight
+```{r}
+ggplot(df, aes(x = Width, y = Weight)) +
+  geom_point(color = "blue", alpha = 0.6) +
+  geom_smooth(method = "lm", formula = y ~ I(x^2), color = "red", se = FALSE) +
+  theme_minimal() +
+  labs(title = "Scatter Plot: Width vs Weight", x = "Width", y = "Weight")
+```
+
+##### Length and Weight
+```{r}
+ggplot(df, aes(x = Length, y = Weight)) +
+  geom_point(color = "blue", alpha = 0.6) +
+  geom_smooth(method = "lm", formula = y ~ I(x^2), color = "red", se = FALSE) +
+  theme_minimal() +
+  labs(title = "Scatter Plot: Length vs Weight", x = "Length", y = "Weight")
+```
+
+##### Height and Weight
+```{r}
+ggplot(df, aes(x = Height, y = Weight)) +
+  geom_point(color = "blue", alpha = 0.6) +
+  geom_smooth(method = "lm", formula = y ~ I(x^2), color = "red", se = FALSE) +
+  theme_minimal() +
+  labs(title = "Scatter Plot: Height vs Weight", x = "Height", y = "Weight")
+```
+
+#### Selecting variables
+We consider the quadratic regression model with all variables
+
+```{r}
+model2_baseline <- lm(Weight ~ Species + Length + Width + Height + I(Length^2) + I(Width^2) + I(Height^2) + I(Width * Height) + I(Width*Length) + I(Height*Length), data = train_set) 
+summary(model2_baseline)
+```
+We perform stepwise search to remove insignificant variables.
+
+```{r}
+model2 <- step(model2_baseline, direction = "backward")
+summary(model2)
+```
+```{r}
+anova(model2, model2_baseline)
+```
+The p-value of the ANOVA test is much higher than the significance level of 0.05, indicating that the removed variables are not significant, and we can use the reduced model.
+
+#### Model testing
+```{r}
+predictions <- predict(model2, newdata = test_set) 
+# Actual values from the test set 
+actual_values <- test_set$Weight
+# Calculate Mean Squared Error (MSE) 
+mse <- mean((predictions - actual_values)^2)  
+# Calculate R-squared 
+rss <- sum((predictions - actual_values)^2) 
+tss <- sum((actual_values - mean(actual_values))^2) 
+r_squared <- 1 - (rss / tss)  
+# Print metrics 
+cat("R-squared:", r_squared, "\n")
+```
+
+#### Model diagnostics
+##### Normality of residuals
+
+We now plot the Q-Q plot of the residuals to check for normality.
+
+```{r}
+e <- model2$residuals
+qqnorm(e)
+qqline(e, col = "red")
+```
+The Q-Q plot shows that most points lie close to the line in the center, but there are deviations at both ends (tails). This suggests that while the residuals are roughly normally distributed in the middle range, there are issues in the tails. This suggests that the normality assumption may not be fully satisfied.
+
+We perform the Shapiro-Wilk test to check for normality of the residuals.
+```{r}
+shapiro.test(e)
+```
+The p-value of the Shapiro-Wilk test is less than 0.05, indicating that the residuals are not normally distributed. This once again aligns with the Q-Q plot, where the residuals have heavier tails than a normal distribution.
+
+##### Homoscedasticity
+
+We also perform the Breusch-Pagan test to check for homoscedasticity.
+
+```{r}
+bptest(model2)
+```
+The p-value of the Breusch-Pagan test is much smaller than 0.05, so we reject the null hypothesis of homoscedasticity. We can conclude that heteroscedasticity is present.
+
+##### Autocorrelation
+
+We perform the Durbin-Watson test to check for autocorrelation.
+
+```{r}
+dwtest(model2, alternative = "two.sided")
+```
+The Durbin-Watson test gives a DW value close to 2, indicating that there is no autocorrelation.
+
+### Compare with the first model
+```{r}
+anova(model1, model2)
+```
+The p-value of the ANOVA test is extremely smaller than the significance level of 0.05, indicating that the added variables into model2 are significant, and we should use model2 since model2 fits the data better.
+
+## 2.1.5 Conclusion
+In this task, we first preprocessed the data by combining the "Length" column, and changing the "Species" column to a factor. We then split the data into training and testing sets. We fitted a baseline linear regression model with all original variables to predict "Weight". 
+
+To improve our baseline model, we **apply the observation achieved from scatter plots** between the predictors and the target to create a new model. We include the full quadratic model of (Length, Height, Width) and add the dummy variables of "Species". Then we run the model through a backward stepwise search to keep significant variables.
+
+However, both of the models is not ideal as the residuals are not normally distributed and heteroscedastic. Nevertheless, the second model is still acceptable as the residuals are approximately normally distributed in the middle range and there is no autocorrelation in the residuals. Finally, we test the new quadratic model on the test set and find that it has a higher R-squared value than the linear model (0.963937 compares to 0.9160474), indicating that the new model is more effective in predicting "Weight", the ANOVA test confirms that.
