@@ -10,6 +10,7 @@ The project includes two activities:
 - Activity 1 (4 points): Analyze a dataset on vehicle fuel consumption (`auto_mpg.csv`). 
 - Activity 2 (6 points): Find two datasets, clean and analyze them, and perform regression analysis on one quantitative variable.
 
+You can find more details in the [`FinalProject_2024.pdf`](FinalProject_2024.pdf) file.
 ## Task 1
 Data set: `auto_mpg.csv` (given by instructor)
 
