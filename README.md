@@ -1,5 +1,11 @@
 # STAT452-Final
-STAT452 Final Project 
+Applied Statistics for Engineers and Scientists II Final Project on Linear Regression
+Authors:
+- Luu Quoc Bao - 22125008
+- Le Minh Hoang - 22125029
+- Le Duc Nhuan - 22125070
+- Dang Minh Nhut - 22125071
+
 ## Task 1
 Data set: `auto_mpg.csv` (given by instructor)
 
